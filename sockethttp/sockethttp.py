@@ -155,11 +155,12 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
     workbook_object = load_workbook(filename=path)
     sheet = workbook_object.worksheets[0]
     max_row_num = sheet.max_row
+    print(max_row_num)
 
     for i in range(2, max_row_num + 1):
         try:
-            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n")
-            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n")
+            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','')
+            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','')
             content = content1 + content2
             content = content.encode("utf-8")
         except AttributeError:
@@ -174,7 +175,12 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             # copy_file(file,'.\\outtime\\')
             continue
         except ConnectionResetError:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(check_eventname_form_waf()))
+            event_name = check_eventname_form_waf()
+            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
+            cell_event_name = sheet.cell(i,1)
+            cell_event_name.value = event_name
+            cell_event_action = sheet.cell(i,2)
+            cell_event_action.value = '拦截'
             success = success + 1
             continue
         except ConnectionAbortedError:
@@ -182,14 +188,22 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
         # print(result)
         if result.find('403') == -1:
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 未拦截')
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '未拦截'
             # copy_file(file,'.\\aes_bypass\\')
         else:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(check_eventname_form_waf()) )
+            event_name = check_eventname_form_waf()
+            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name) )
+            cell_event_name = sheet.cell(i, 1)
+            cell_event_name.value = event_name
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '拦截'
             success = success + 1
             # copy_file(file,'.\\command-wubao\\')
+    workbook_object.save('test3.xlsx')
     print("一共发送样本数量：{}".format(max_row_num - 1))
     print("拦截数：{}".format(success))
-    print("未拦截数：{}".format(max_row_num - success))
+    print("未拦截数：{}".format(max_row_num - success - 1))
     print("检测率：" + str(success / max_row_num))
 
 def check_eventname_form_waf():
