@@ -3,7 +3,7 @@ import os
 import argparse
 import sys
 from concurrent.futures import ThreadPoolExecutor,as_completed
-
+import re
 import requests
 from openpyxl import load_workbook
 
@@ -155,12 +155,15 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
     workbook_object = load_workbook(filename=path)
     sheet = workbook_object.worksheets[0]
     max_row_num = sheet.max_row
+    print(max_row_num)
 
     for i in range(2, max_row_num + 1):
         try:
-            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n")
-            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n")
+            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','')
+            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','') + "\r\n\r\n"
+            content1 = re.sub(r'Content-Length:[\s0-9]*','Content-Length: {}\r\n'.format(len(content2)),content1)
             content = content1 + content2
+            #print(content)
             content = content.encode("utf-8")
         except AttributeError:
             continue
@@ -174,7 +177,12 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             # copy_file(file,'.\\outtime\\')
             continue
         except ConnectionResetError:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(check_eventname_form_waf()))
+            event_name = check_eventname_form_waf()
+            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
+            cell_event_name = sheet.cell(i,1)
+            cell_event_name.value = event_name
+            cell_event_action = sheet.cell(i,2)
+            cell_event_action.value = '拦截'
             success = success + 1
             continue
         except ConnectionAbortedError:
@@ -182,14 +190,22 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
         # print(result)
         if result.find('403') == -1:
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 未拦截')
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '未拦截'
             # copy_file(file,'.\\aes_bypass\\')
         else:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(check_eventname_form_waf()) )
+            event_name = check_eventname_form_waf()
+            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name) )
+            cell_event_name = sheet.cell(i, 1)
+            cell_event_name.value = event_name
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '拦截'
             success = success + 1
             # copy_file(file,'.\\command-wubao\\')
+    workbook_object.save('xxe.xlsx')
     print("一共发送样本数量：{}".format(max_row_num - 1))
     print("拦截数：{}".format(success))
-    print("未拦截数：{}".format(max_row_num - success))
+    print("未拦截数：{}".format(max_row_num - success - 1))
     print("检测率：" + str(success / max_row_num))
 
 def check_eventname_form_waf():
@@ -198,7 +214,7 @@ def check_eventname_form_waf():
         'Cookie': 'SID=s%3AX4F1sfbMT6zGopThbAuy6mRgHuAynYQD.IfyCgthHscW7IgTLTseuCvYOxc9L72SWRD2nzKHjiAs; VWPHPUSERID=adm',
         'Content-Type':'application/json',
         'Connection':'close',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2NzkzMDY5MjA5MzktMC4yNTIxMTM0NDUyNDc0MDIxIiwiaWF0IjoxNjc5MzA2OTM1LCJleHAiOjE2NzkzMzU3MzV9.KYfUs7Ph4ZpB4FI9e5xwKq772JRKS0ej4R81SDdMWVk'
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2NzkzNjQ2MTA4MjgtMC41MDAzOTkzNzUzOTgwMyIsImlhdCI6MTY3OTM2NDYxNCwiZXhwIjoxNjc5MzkzNDE0fQ.XcEymcVYzG91UsWPFu7kaKFeskkRCnGRz41AaM9Kedk'
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
@@ -284,5 +300,5 @@ if __name__ == '__main__':
     # else:
     #     muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
 
-    send_from_xlsx_plus("99.99.99.88",80,"test1.xlsx",6,7)
+    send_from_xlsx_plus("99.99.99.88",80,"java.xlsx",7,8)
     #check_eventname_form_waf()
