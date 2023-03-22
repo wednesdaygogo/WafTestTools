@@ -146,7 +146,7 @@ def send_from_xlsx(url,port,path):
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(max_row_num - success))
     print("检测率：" + str(success / max_row_num))
-def send_from_xlsx_plus(url,port,path,column1,column2):
+def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
 
     if os.path.splitext(path)[-1] != '.xlsx':
         print('-x 参数需为xlsx后缀文件')
@@ -205,7 +205,7 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             cell_event_action.value = '拦截'
             success = success + 1
             # copy_file(file,'.\\command-wubao\\')
-    workbook_object.save('waf_rule.xlsx')
+    workbook_object.save(path_2)
     print("一共发送样本数量：{}".format(max_row_num - 1))
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(max_row_num - success - 1))
@@ -221,18 +221,18 @@ def check_eventname_form_waf():
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
-    response = requests.post(url=url, json=data,headers=header)
-    result = response.json()
-    return result['data']['rows'][0]['evt_name']
-    # while True:
-    #     response_1 = requests.post(url=url, json=data,headers=header)
-    #     response_2 = requests.post(url=url, json=data, headers=header)
-    #     result_1 = response_1.json()
-    #     result_2 = response_2.json()
-    #     if result_1['data']['rows'][0]['evt_name'] == result_2['data']['rows'][0]['evt_name']:
-    #         break
+    # response = requests.post(url=url, json=data,headers=header)
+    # result = response.json()
+    # return result['data']['rows'][0]['evt_name']
+    while True:
+        response_1 = requests.post(url=url, json=data,headers=header)
+        response_2 = requests.post(url=url, json=data, headers=header)
+        result_1 = response_1.json()
+        result_2 = response_2.json()
+        if result_1['data']['rows'][0]['evt_name'] == result_2['data']['rows'][0]['evt_name']:
+            break
 
-    # return result_2['data']['rows'][0]['evt_name']
+    return result_2['data']['rows'][0]['evt_name']
 
 def single_thread_test(url,port,file_dir):
     dir = []
@@ -282,34 +282,40 @@ def single_thread_test(url,port,file_dir):
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("-u", "--url", help="Target ip;Example:10.88.1.220")
-    # parser.add_argument("-p", "--port", help="Target port;Example:8001")
-    # parser.add_argument("-d", "--dir", help="Target file;Example:D:\pythonProject\sockethttp\\text")
-    # parser.add_argument("-t", "--threads", help="thread number;Example:-t 10代表10个线程")
-    # parser.add_argument("-w","--white",help="白流量测试；Example: -w white_base64 表示测试white_base64类型白流量，all测试全部类型")
-    # parser.add_argument("-b", "--black", help="黑流量测试；Example: -b php_serilize 表示测试php_serilize类型黑流量，all测试全部类型")
-    # parser.add_argument("-x", "--xlsx", help="从xlsx中读取payload测试，要求xlsx文件第一列为payload Example: -x ./xxx.xlsx")
-    # args = parser.parse_args()
-    # if args.threads == None:
-    #     if args.white != None:
-    #         if args.white == 'all':
-    #             single_thread_test(args.url,int(args.port),'white_all')
-    #         else:
-    #             single_thread_test(args.url,int(args.port),white_payload_path[args.white])
-    #     if args.black != None:
-    #         if args.black == 'all':
-    #             single_thread_test(args.url,int(args.port),'black_all')
-    #         else:
-    #             single_thread_test(args.url,int(args.port),black_payload_path[args.black])
-    #     if args.dir != None:
-    #         single_thread_test(args.url, int(args.port),args.dir)
-    #     if args.xlsx != None:
-    #         send_from_xlsx(args.url,int(args.port),args.xlsx)
-    #
-    #
-    # else:
-    #     muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-u", "--url", help="Target ip;Example:10.88.1.220")
+    parser.add_argument("-p", "--port", help="Target port;Example:8001")
+    parser.add_argument("-d", "--dir", help="Target file;Example:D:\pythonProject\sockethttp\\text")
+    parser.add_argument("-t", "--threads", help="thread number;Example:-t 10代表10个线程")
+    parser.add_argument("-w","--white",help="白流量测试；Example: -w white_base64 表示测试white_base64类型白流量，all测试全部类型")
+    parser.add_argument("-b", "--black", help="黑流量测试；Example: -b php_serilize 表示测试php_serilize类型黑流量，all测试全部类型")
+    parser.add_argument("-x", "--xlsx", help="从xlsx中读取payload测试，要求xlsx文件第一列为payload Example: -x ./xxx.xlsx")
+    parser.add_argument("-xp", "--xlsxplus", help="从xlsx中读取payload测试，用于测试请求体和请求头分别在两列的表，测试完成后在原表的1，2列添加事件名称和测试结果")
+    parser.add_argument("-df", "--dstfile", help="xlsxplus测试功能结果生成的目标文件")
+    parser.add_argument("-c1", "--column1", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前)")
+    parser.add_argument("-c2", "--column2", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前)")
+    args = parser.parse_args()
+    if args.threads == None:
+        if args.white != None:
+            if args.white == 'all':
+                single_thread_test(args.url,int(args.port),'white_all')
+            else:
+                single_thread_test(args.url,int(args.port),white_payload_path[args.white])
+        if args.black != None:
+            if args.black == 'all':
+                single_thread_test(args.url,int(args.port),'black_all')
+            else:
+                single_thread_test(args.url,int(args.port),black_payload_path[args.black])
+        if args.dir != None:
+            single_thread_test(args.url, int(args.port),args.dir)
+        if args.xlsx != None:
+            send_from_xlsx(args.url,int(args.port),args.xlsx)
+        if args.xlsxplus != None:
+            send_from_xlsx_plus(args.url,int(args.port), args.xlsxplus,args.dstfile, int(args.column1), int(args.column2))
 
-    send_from_xlsx_plus("99.99.99.88",80,"test2.xlsx",7,8)
+
+    else:
+        muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
+
+    #send_from_xlsx_plus("99.99.99.88",80,"test2.xlsx","sss.xlsx",7,8)
     #check_eventname_form_waf()
