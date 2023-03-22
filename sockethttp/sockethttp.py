@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 import re
 import requests
 from openpyxl import load_workbook
+import time
 
 black_payload_path ={
     'php_code_injection':'./black_list/phpcodeinject_small_4k_payload/',
@@ -155,12 +156,12 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
     workbook_object = load_workbook(filename=path)
     sheet = workbook_object.worksheets[0]
     max_row_num = sheet.max_row
-    print(max_row_num)
+    #print(max_row_num)
 
     for i in range(2, max_row_num + 1):
         try:
-            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','')
-            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','') + "\r\n\r\n"
+            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"')
+            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"') + "\r\n\r\n"
             content1 = re.sub(r'Content-Length:[\s0-9]*','Content-Length: {}\r\n'.format(len(content2)),content1)
             content = content1 + content2
             #print(content)
@@ -177,6 +178,7 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             # copy_file(file,'.\\outtime\\')
             continue
         except ConnectionResetError:
+            time.sleep(0.4)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
             cell_event_name = sheet.cell(i,1)
@@ -194,6 +196,7 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             cell_event_action.value = '未拦截'
             # copy_file(file,'.\\aes_bypass\\')
         else:
+            time.sleep(0.4)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name) )
             cell_event_name = sheet.cell(i, 1)
@@ -202,7 +205,7 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
             cell_event_action.value = '拦截'
             success = success + 1
             # copy_file(file,'.\\command-wubao\\')
-    workbook_object.save('xxe.xlsx')
+    workbook_object.save('waf_rule.xlsx')
     print("一共发送样本数量：{}".format(max_row_num - 1))
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(max_row_num - success - 1))
@@ -211,17 +214,25 @@ def send_from_xlsx_plus(url,port,path,column1,column2):
 def check_eventname_form_waf():
     header = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
-        'Cookie': 'SID=s%3AX4F1sfbMT6zGopThbAuy6mRgHuAynYQD.IfyCgthHscW7IgTLTseuCvYOxc9L72SWRD2nzKHjiAs; VWPHPUSERID=adm',
+        'Cookie': 'SID=s%3A2Fj3e5T_De3hzUumnin_wYRlCmCreOzj.p5J90QQ1G2VfJHakEi3T8vuHDMNl2hXkIiHtdBC8%2BMM; VWPHPUSERID=adm',
         'Content-Type':'application/json',
         'Connection':'close',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2NzkzNjQ2MTA4MjgtMC41MDAzOTkzNzUzOTgwMyIsImlhdCI6MTY3OTM2NDYxNCwiZXhwIjoxNjc5MzkzNDE0fQ.XcEymcVYzG91UsWPFu7kaKFeskkRCnGRz41AaM9Kedk'
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk0NTE1MzI5NTItMC42MjY2MjI5MzQ4MTE3MTcyIiwiaWF0IjoxNjc5NDUyMTEwLCJleHAiOjE2Nzk0ODA5MTB9.wAbn4BRwMtCdGZJUVB7hWFys0ufFGQQtmxkl2UaxMMw'
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
-
     response = requests.post(url=url, json=data,headers=header)
     result = response.json()
     return result['data']['rows'][0]['evt_name']
+    # while True:
+    #     response_1 = requests.post(url=url, json=data,headers=header)
+    #     response_2 = requests.post(url=url, json=data, headers=header)
+    #     result_1 = response_1.json()
+    #     result_2 = response_2.json()
+    #     if result_1['data']['rows'][0]['evt_name'] == result_2['data']['rows'][0]['evt_name']:
+    #         break
+
+    # return result_2['data']['rows'][0]['evt_name']
 
 def single_thread_test(url,port,file_dir):
     dir = []
@@ -300,5 +311,5 @@ if __name__ == '__main__':
     # else:
     #     muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
 
-    send_from_xlsx_plus("99.99.99.88",80,"java.xlsx",7,8)
+    send_from_xlsx_plus("99.99.99.88",80,"test2.xlsx",7,8)
     #check_eventname_form_waf()
