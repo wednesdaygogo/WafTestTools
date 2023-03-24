@@ -44,6 +44,7 @@ def send(ip,port,content):
     #print(content)
     url = ip
     port = port
+    socket.setdefaulttimeout(5)
     sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     sock.connect((url,port))
     sock.sendall(content)
@@ -146,7 +147,7 @@ def send_from_xlsx(url,port,path):
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(max_row_num - success))
     print("检测率：" + str(success / max_row_num))
-def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
+def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
 
     if os.path.splitext(path)[-1] != '.xlsx':
         print('-x 参数需为xlsx后缀文件')
@@ -156,14 +157,18 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
     workbook_object = load_workbook(filename=path)
     sheet = workbook_object.worksheets[0]
     max_row_num = sheet.max_row
-    #print(max_row_num)
+    print(max_row_num)
 
     for i in range(2, max_row_num + 1):
         try:
-            content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"')
-            content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"') + "\r\n\r\n"
-            content1 = re.sub(r'Content-Length:[\s0-9]*','Content-Length: {}\r\n'.format(len(content2)),content1)
-            content = content1 + content2
+            if column2 == None:
+                content = str(sheet[i][column1].value)+"\r\n"
+                # content = str(sheet[i][column1].value).strip('"').replace("\\r\\n", "\r\n").replace('\\"', '"')
+            else:
+                content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"')
+                content2 = str(sheet[i][column2].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"') + "\r\n\r\n"
+                content1 = re.sub(r'Content-Length:[\s0-9]*','Content-Length: {}\r\n'.format(len(content2)),content1)
+                content = content1 + content2
             #print(content)
             content = content.encode("utf-8")
         except AttributeError:
@@ -178,7 +183,7 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
             # copy_file(file,'.\\outtime\\')
             continue
         except ConnectionResetError:
-            time.sleep(0.4)
+            #time.sleep(0.4)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
             cell_event_name = sheet.cell(i,1)
@@ -189,6 +194,11 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
             continue
         except ConnectionAbortedError:
             continue
+        except:
+            print('序号:' + str(count) + ' ' + 'line: ' + str(i) + ' 未拦截')
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '未拦截'
+            continue
         # print(result)
         if result.find('403') == -1:
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 未拦截')
@@ -196,7 +206,7 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2):
             cell_event_action.value = '未拦截'
             # copy_file(file,'.\\aes_bypass\\')
         else:
-            time.sleep(0.4)
+            #time.sleep(0.4)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name) )
             cell_event_name = sheet.cell(i, 1)
@@ -217,7 +227,7 @@ def check_eventname_form_waf():
         'Cookie': 'SID=s%3A2Fj3e5T_De3hzUumnin_wYRlCmCreOzj.p5J90QQ1G2VfJHakEi3T8vuHDMNl2hXkIiHtdBC8%2BMM; VWPHPUSERID=adm',
         'Content-Type':'application/json',
         'Connection':'close',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk0NTE1MzI5NTItMC42MjY2MjI5MzQ4MTE3MTcyIiwiaWF0IjoxNjc5NDUyMTEwLCJleHAiOjE2Nzk0ODA5MTB9.wAbn4BRwMtCdGZJUVB7hWFys0ufFGQQtmxkl2UaxMMw'
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk2NDAwMTI2NDMtMC43MDgxMjczODY3NDM5MzE5IiwiaWF0IjoxNjc5NjQwMTUwLCJleHAiOjE2Nzk2Njg5NTB9.7G_97IQfxUTcNqtW_1sAAchDOfCYFM3VqxeVKjG4YGo'
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
@@ -292,8 +302,8 @@ if __name__ == '__main__':
     parser.add_argument("-x", "--xlsx", help="从xlsx中读取payload测试，要求xlsx文件第一列为payload Example: -x ./xxx.xlsx")
     parser.add_argument("-xp", "--xlsxplus", help="从xlsx中读取payload测试，用于测试请求体和请求头分别在两列的表，测试完成后在原表的1，2列添加事件名称和测试结果")
     parser.add_argument("-df", "--dstfile", help="xlsxplus测试功能结果生成的目标文件")
-    parser.add_argument("-c1", "--column1", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前)")
-    parser.add_argument("-c2", "--column2", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前)")
+    parser.add_argument("-c1", "--column1", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前,c2不写的话就只读c1)")
+    parser.add_argument("-c2", "--column2", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前，c2不写的话就只读c1)")
     args = parser.parse_args()
     if args.threads == None:
         if args.white != None:
@@ -311,11 +321,13 @@ if __name__ == '__main__':
         if args.xlsx != None:
             send_from_xlsx(args.url,int(args.port),args.xlsx)
         if args.xlsxplus != None:
-            send_from_xlsx_plus(args.url,int(args.port), args.xlsxplus,args.dstfile, int(args.column1), int(args.column2))
-
+            if args.column2 == None:
+                send_from_xlsx_plus(args.url,int(args.port), args.xlsxplus,args.dstfile, int(args.column1))
+            else:
+                send_from_xlsx_plus(args.url, int(args.port), args.xlsxplus, args.dstfile, int(args.column1),int(args.column2))
 
     else:
         muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
 
-    #send_from_xlsx_plus("99.99.99.88",80,"test2.xlsx","sss.xlsx",7,8)
+    send_from_xlsx_plus("99.99.99.88",80,"aes.xlsx","aes2.xlsx",18)
     #check_eventname_form_waf()
