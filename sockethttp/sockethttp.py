@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor,as_completed
 import re
 import requests
 from openpyxl import load_workbook
-import time
+import shutil
 
 black_payload_path ={
     'php_code_injection':'./black_list/phpcodeinject_small_4k_payload/',
@@ -38,8 +38,7 @@ def copy_file(src,dst):
     isexist = os.path.exists(dst)
     if not isexist:
         os.makedirs(dst)
-    cmd = 'copy {} {}'.format(src,dst)
-    os.system(cmd)
+    shutil.copy(src,dst)
 def send(ip,port,content):
     #print(content)
     url = ip
@@ -227,7 +226,7 @@ def check_eventname_form_waf():
         'Cookie': 'SID=s%3A2Fj3e5T_De3hzUumnin_wYRlCmCreOzj.p5J90QQ1G2VfJHakEi3T8vuHDMNl2hXkIiHtdBC8%2BMM; VWPHPUSERID=adm',
         'Content-Type':'application/json',
         'Connection':'close',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk2NDAwMTI2NDMtMC43MDgxMjczODY3NDM5MzE5IiwiaWF0IjoxNjc5NjQwMTUwLCJleHAiOjE2Nzk2Njg5NTB9.7G_97IQfxUTcNqtW_1sAAchDOfCYFM3VqxeVKjG4YGo'
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk4ODI2MzMzMzEtMC4wNjI5Nzc4MDUyMTQ3MDE4NyIsImlhdCI6MTY3OTg5Njc0OSwiZXhwIjoxNjc5OTI1NTQ5fQ.08iDyf4cLtqgm8hEYsVhGBrg8L43g67KQpiJ1MC9rAo'
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
@@ -259,6 +258,7 @@ def single_thread_test(url,port,file_dir):
             file_dir = file_dir + '/'
         dir = read_dir(file_dir)
     total = len(dir)
+    #print(total)
     for file in dir:
         content = read_file(file)
         try:
@@ -268,22 +268,30 @@ def single_thread_test(url,port,file_dir):
             #print(result)
         except TimeoutError:
             print('序号:'+str(count) + ' ' + file + ' 连接超时')
-            #copy_file(file,'.\\outtime\\')
+            #copy_file(file,'.\\qm_yes\\')
             continue
         except ConnectionResetError:
             print('序号:'+str(count) + ' ' + file + ' 已拦截')
             success = success + 1
+            #copy_file(file, '.\\qm_yes\\')
             continue
         except ConnectionAbortedError:
+            print('序号:' + str(count) + ' ' + file + '已拦截')
+            success = success + 1
+            # copy_file(file, '.\\qm_yes\\')
             continue
+        except:
+            print('序号:' + str(count) + ' ' + file + ' 未拦截')
+            continue
+            #copy_file(file, './qm_yes_ct_no/')
         #print(result)
         if result.find('403') == -1:
             print('序号:'+str(count) + ' ' + file + ' 未拦截')
-            #copy_file(file,'.\\aes_bypass\\')
+            #copy_file(file,'./qm_yes_ct_no/')
         else:
             print('序号:'+str(count) + ' ' + file + ' 已拦截')
             success = success + 1
-            #copy_file(file,'.\\command-wubao\\')
+            #copy_file(file,'./qm_yes_ct_no/')
     print("一共发送样本数量：{}".format(total))
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(total-success))
@@ -329,5 +337,5 @@ if __name__ == '__main__':
     else:
         muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
 
-    send_from_xlsx_plus("99.99.99.88",80,"aes.xlsx","aes2.xlsx",18)
+    #send_from_xlsx_plus("99.99.99.88",80,"aes.xlsx","aes2.xlsx",18)
     #check_eventname_form_waf()
