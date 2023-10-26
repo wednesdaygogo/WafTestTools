@@ -2,6 +2,7 @@ import socket
 import os
 import argparse
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor,as_completed
 import re
 import requests
@@ -19,7 +20,7 @@ black_payload_path ={
 white_payload_path = {
     'white_base64':'./white_list/white_payload_base64/',
     'white_picture':'./white_list/white_payload_picture/',
-    'white_internet_post':'./white_list/internet_post_payload/',
+    'white_internet_post':'./white_list/venus_internet_post_payload/',
     'normal_string':'./white_list/normal_string_post_payload/',
 }
 
@@ -27,12 +28,31 @@ def read_dir(path):
     filelist = []
     files = os.listdir(path)
     for file in files:
-        filelist.append(path + file)
+        filelist.append(path +file)
     return filelist
 def read_file(path):
-    with open(path,'rb') as f:
-        content = f.read()
-    return content
+    with open(path,'r',encoding='utf-8') as f:
+        content = f.read().replace('\r','').replace('\n','\r\n')
+    return content+'\r\n\r\n'
+def process_http_request(data):
+    if data.startswith('GET') or data.startswith('POST') or data.startswith('PUT') or data.startswith('DELETE'):
+        headers, body = data.split('\r\n\r\n', 1)
+        headers = headers.split('\r\n')
+        content_length_present = False
+
+        for i, header in enumerate(headers):
+            if header.startswith('Content-Length:'):
+                headers[i] = 'Content-Length: ' + str(len(body))
+                content_length_present = True
+                break
+
+        if not content_length_present:
+            headers.append('Content-Length: ' + str(len(body)))
+
+        return '\r\n'.join(headers) + '\r\n\r\n' + body
+    else:
+        return data
+
 
 def copy_file(src,dst):
     isexist = os.path.exists(dst)
@@ -105,47 +125,6 @@ def muti_thread_test(url,port,dir,threads):
     print("超时数量：" + str(out_time))
     print("检测率："+str(success/success+faild+out_time))
 
-def send_from_xlsx(url,port,path):
-    if os.path.splitext(path)[-1] != '.xlsx':
-        print('-x 参数需为xlsx后缀文件')
-        sys.exit()
-    success = 0
-    count = 0
-    workbook_object = load_workbook(filename=path)
-    sheet = workbook_object.worksheets[0]
-    max_row_num = sheet.max_row
-    for i in range(2, max_row_num + 1):
-        try:
-            content = sheet[i][0].value.lstrip().encode("utf-8")
-        except AttributeError:
-            continue
-        try:
-            count = count + 1
-            result = send(url, int(port), content)
-
-            # print(result)
-        except TimeoutError:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 连接超时')
-            # copy_file(file,'.\\outtime\\')
-            continue
-        except ConnectionResetError:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截')
-            success = success + 1
-            continue
-        except ConnectionAbortedError:
-            continue
-        # print(result)
-        if result.find('403') == -1:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 未拦截')
-            # copy_file(file,'.\\aes_bypass\\')
-        else:
-            print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截')
-            success = success + 1
-            # copy_file(file,'.\\command-wubao\\')
-    print("一共发送样本数量：{}".format(max_row_num))
-    print("拦截数：{}".format(success))
-    print("未拦截数：{}".format(max_row_num - success))
-    print("检测率：" + str(success / max_row_num))
 def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
 
     if os.path.splitext(path)[-1] != '.xlsx':
@@ -155,13 +134,15 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
     count = 0
     workbook_object = load_workbook(filename=path)
     sheet = workbook_object.worksheets[0]
+    print(sheet.title)
     max_row_num = sheet.max_row
     print(max_row_num)
 
     for i in range(2, max_row_num + 1):
         try:
             if column2 == None:
-                content = str(sheet[i][column1].value)+"\r\n"
+                content = str(sheet[i][column1].value).lstrip().replace("\n","\r\n")+"\r\n\r\n"
+                content = process_http_request(content)
                 # content = str(sheet[i][column1].value).strip('"').replace("\\r\\n", "\r\n").replace('\\"', '"')
             else:
                 content1 = str(sheet[i][column1].value).strip('"').replace("\\r\\n","\r\n").replace('\\"','"')
@@ -175,14 +156,12 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
         try:
             count = count + 1
             result = send(url, int(port), content)
-
-            # print(result)
         except TimeoutError:
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 连接超时')
             # copy_file(file,'.\\outtime\\')
             continue
         except ConnectionResetError:
-            #time.sleep(0.4)
+            time.sleep(0.6)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
             cell_event_name = sheet.cell(i,1)
@@ -192,6 +171,14 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
             success = success + 1
             continue
         except ConnectionAbortedError:
+            time.sleep(0.6)
+            event_name = check_eventname_form_waf()
+            print('序号:' + str(count) + ' ' + 'line: ' + str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name))
+            cell_event_name = sheet.cell(i, 1)
+            cell_event_name.value = event_name
+            cell_event_action = sheet.cell(i, 2)
+            cell_event_action.value = '拦截'
+            success = success + 1
             continue
         except:
             print('序号:' + str(count) + ' ' + 'line: ' + str(i) + ' 未拦截')
@@ -199,13 +186,13 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
             cell_event_action.value = '未拦截'
             continue
         # print(result)
-        if result.find('403') == -1:
+        if result.find('403') == -1 and result.find('307') == -1:
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 未拦截')
             cell_event_action = sheet.cell(i, 2)
             cell_event_action.value = '未拦截'
             # copy_file(file,'.\\aes_bypass\\')
         else:
-            #time.sleep(0.4)
+            time.sleep(0.6)
             event_name = check_eventname_form_waf()
             print('序号:' + str(count) + ' ' + 'line: '+ str(i) + ' 已拦截  ' + '上报事件:{}'.format(event_name) )
             cell_event_name = sheet.cell(i, 1)
@@ -218,15 +205,17 @@ def send_from_xlsx_plus(url,port,path,path_2,column1,column2=None):
     print("一共发送样本数量：{}".format(max_row_num - 1))
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(max_row_num - success - 1))
-    print("检测率：" + str(success / max_row_num))
+    print("检测率：" + str(success / (max_row_num - 1)))
 
-def check_eventname_form_waf():
+def check_eventname_form_waf(open=1):
+    if open == 1:
+        return "事件名称查询功能未开启"
     header = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36',
-        'Cookie': 'SID=s%3A2Fj3e5T_De3hzUumnin_wYRlCmCreOzj.p5J90QQ1G2VfJHakEi3T8vuHDMNl2hXkIiHtdBC8%2BMM; VWPHPUSERID=adm',
+        'Cookie': 'SID=s%3A0SUqI9px8ef40VTt9ny6m3mSmyUxhqiM.msnruVtgrlAx38bubFluco7wC9ieEwwHsuthi2oaaxE; VWPHPUSERID=adm',
         'Content-Type':'application/json',
         'Connection':'close',
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2Nzk4ODI2MzMzMzEtMC4wNjI5Nzc4MDUyMTQ3MDE4NyIsImlhdCI6MTY3OTg5Njc0OSwiZXhwIjoxNjc5OTI1NTQ5fQ.08iDyf4cLtqgm8hEYsVhGBrg8L43g67KQpiJ1MC9rAo'
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbSIsImtleSI6IjE2OTEzNzUzMzk4MDEtMC43NTkzMjQ0MDY4MzgwMDMiLCJpYXQiOjE2OTEzODg1NzQsImV4cCI6MTY5MTQxNzM3NH0.EXnZCwj7YpLsOqBK_vxwktlALLsHtLIfLcvVd3jFw0U'
     }
     data = {"page":1,"limit":1,"isEnglish":0,"searchType":"ad","searchstr":"","auditlinkage_dstip":"","auditlinkage_uv":"","auditlinkage_pv":"","auditlinkage_port":0,"auditlinkage_wafip":"10.51.15.186","filters":[],"chk_time":"on","chk_evt_name":"on","chk_evt_group":"on","chk_evt_level":"on","chk_x_forwarded_for":"on","chk_srcip_str":"on","chk_srcport":"on","chk_dstip_str":128,"chk_dstport":"on","chk_action":"on","chk_rawguid":"on"}
     url = "http://10.51.15.186/securityeventmonitoring/eventmonlist"
@@ -261,10 +250,12 @@ def single_thread_test(url,port,file_dir):
     #print(total)
     for file in dir:
         content = read_file(file)
+        #print(content)
         try:
             count = count + 1
-            result  = send(url,int(port),content)
-
+            #print(process_http_request(content))
+            result = send(url,int(port),process_http_request(content).encode('utf-8'))
+            #print(process_http_request(content))
             #print(result)
         except TimeoutError:
             print('序号:'+str(count) + ' ' + file + ' 连接超时')
@@ -283,15 +274,15 @@ def single_thread_test(url,port,file_dir):
         except:
             print('序号:' + str(count) + ' ' + file + ' 未拦截')
             continue
-            #copy_file(file, './qm_yes_ct_no/')
+            copy_file(file, './pycat_no/')
         #print(result)
         if result.find('403') == -1:
             print('序号:'+str(count) + ' ' + file + ' 未拦截')
-            #copy_file(file,'./qm_yes_ct_no/')
+            copy_file(file, './pycat_no/')
         else:
             print('序号:'+str(count) + ' ' + file + ' 已拦截')
             success = success + 1
-            #copy_file(file,'./qm_yes_ct_no/')
+            copy_file(file,'./php_wubao/')
     print("一共发送样本数量：{}".format(total))
     print("拦截数：{}".format(success))
     print("未拦截数：{}".format(total-success))
@@ -307,11 +298,10 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--threads", help="thread number;Example:-t 10代表10个线程")
     parser.add_argument("-w","--white",help="白流量测试；Example: -w white_base64 表示测试white_base64类型白流量，all测试全部类型")
     parser.add_argument("-b", "--black", help="黑流量测试；Example: -b php_serilize 表示测试php_serilize类型黑流量，all测试全部类型")
-    parser.add_argument("-x", "--xlsx", help="从xlsx中读取payload测试，要求xlsx文件第一列为payload Example: -x ./xxx.xlsx")
     parser.add_argument("-xp", "--xlsxplus", help="从xlsx中读取payload测试，用于测试请求体和请求头分别在两列的表，测试完成后在原表的1，2列添加事件名称和测试结果")
     parser.add_argument("-df", "--dstfile", help="xlsxplus测试功能结果生成的目标文件")
     parser.add_argument("-c1", "--column1", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前,c2不写的话就只读c1)")
-    parser.add_argument("-c2", "--column2", help="xlsxplus测试功能参与拼接的列数1(有先后顺序，c1拼接在c2之前，c2不写的话就只读c1)")
+    parser.add_argument("-c2", "--column2", help="xlsxplus测试功能参与拼接的列数2(有先后顺序，c1拼接在c2之前，c2不写的话就只读c1)")
     args = parser.parse_args()
     if args.threads == None:
         if args.white != None:
@@ -326,8 +316,6 @@ if __name__ == '__main__':
                 single_thread_test(args.url,int(args.port),black_payload_path[args.black])
         if args.dir != None:
             single_thread_test(args.url, int(args.port),args.dir)
-        if args.xlsx != None:
-            send_from_xlsx(args.url,int(args.port),args.xlsx)
         if args.xlsxplus != None:
             if args.column2 == None:
                 send_from_xlsx_plus(args.url,int(args.port), args.xlsxplus,args.dstfile, int(args.column1))
@@ -337,5 +325,6 @@ if __name__ == '__main__':
     else:
         muti_thread_test(args.url,int(args.port),args.dir,int(args.threads))
 
-    #send_from_xlsx_plus("99.99.99.88",80,"aes.xlsx","aes2.xlsx",18)
-    #check_eventname_form_waf()
+    # txt = read_file('D:\pythonProject\sockethttp\\test1\\16.txt')
+    # print(process_http_request(txt))
+
